@@ -10,11 +10,9 @@ Got one of those power meters at home that blink an LED? You can track and monit
 
 # Setup
 - ESP8266
-1. Wiring
-Wire the ESP8266 like this and place the photoresistor over the power meter's LED. If the meter is not in a place where there's relatively constant light, you'll want to somehow seal it or there will be interference.  
+1. Wiring - wire the ESP8266 like this and place the photoresistor over the power meter's LED. If the meter is not in a place where there's relatively constant light, you'll want to somehow seal it or there will be interference.  
 ![alt text](https://cdn.instructables.com/F8S/AYSW/J4YFZ2UB/F8SAYSWJ4YFZ2UB.LARGE.jpg?auto=webp&frame=1&width=831&fit=bounds "Wiring")
-2. Code
-Upload the code on the ESP8266 and you're good to go.
+2. Code - upload the code on the ESP8266 and you're good to go.
 **How does the code work?**
 At startup, the ESP8266 does a calibration. This means that it should be powered up only when sure the meter's LED will not be blinking. 
 **How does it calibrate?**
