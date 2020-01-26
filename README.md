@@ -18,12 +18,21 @@ Got one of those power meters at home that blink an LED? You can track and monit
  <br/>
  
 2. Code
+
  <br/>
  
   Upload the code on the ESP8266 and you're good to go.
+ <br/>
+ 
 **How does the code work?**
+<br/>
+ 
 At startup, the ESP8266 does a calibration. This means that it should be powered up only when sure the meter's LED will not be blinking. 
+<br/>
+ 
 **How does it calibrate?**
+ <br/>
+ 
 The meter's LED off state is considered a base reading. Given that we are using an analog input, there will be noise. The ESP8266 does 100 readings at an interval of 10 ms and calculates the mean and the standard deviation of the readings. Whenever the meter's LED blinks, it gives a reading that is beyond + or - 2 standard deviations (depending on whether the photoresistor is pulled up or down by the resistor - the code accounts for either of these possibilities). When this happens, a POST request is made to the local ASP.NET Core middleware, which logs the reading, groups readings into days and forwards the request to the DSMR Reader server instance (yes, the middleware can be removed, but this requires some timing calculations on the ESP8266 which were 1000x easier to write in C#). The ESP8266 then waits for the reading to come back within normal range (<2 SDs) and waits for the next LED blink.
 
 # Results
