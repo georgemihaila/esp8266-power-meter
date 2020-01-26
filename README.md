@@ -1,6 +1,6 @@
 # ESP8266 Power meter
 # What is this?
-Got one of those power meters at home that blink an LED? You can track and monitor your home power consumption using an ESP8266 and a DSMR Reader server. 
+Got one of those power meters at home that blink an LED? You can track and monitor your home power consumption using an ESP8266 and a DSMR Reader server instance. 
 # Requirements
 
   - any version of [ASP.NET Core](https://dotnet.microsoft.com/download)
