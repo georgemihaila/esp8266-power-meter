@@ -3,9 +3,12 @@
 Got one of those power meters at home that blink an LED? You can track and monitor your home power consumption using an ESP8266 and a DSMR Reader server instance. 
 # Requirements
 
-  - any version of [ASP.NET Core](https://dotnet.microsoft.com/download)
   - a local [DSMR Reader](https://github.com/dennissiemensma/dsmr-reader) instance
-  - an ESP8266, a 4.7k ohm resistor (or any other value) and a photoresistor
+  - 1x ESP8266
+  - 1x 4.7k ohm resistor
+  - 1x photoresistor
+  - 1x SSD1306 OLED Display
+  - 1x DS1307 RTC
 
 
 # Setup
@@ -13,8 +16,10 @@ Got one of those power meters at home that blink an LED? You can track and monit
 1. Wiring
  <br/>
  
-  Wire the ESP8266 like this and place the photoresistor over the power meter's LED. If the meter is not in a place where there's relatively constant light, you'll want to somehow seal it or there will be interference.  
-![alt text](https://cdn.instructables.com/F8S/AYSW/J4YFZ2UB/F8SAYSWJ4YFZ2UB.LARGE.jpg?auto=webp&frame=1&width=831&fit=bounds "Wiring")
+  Wiring should be pretty straightforward. [Pull the photoresistor down](https://cdn.instructables.com/F8S/AYSW/J4YFZ2UB/F8SAYSWJ4YFZ2UB.LARGE.jpg?auto=webp&frame=1&width=831&fit=bounds) using the resistor and use A0 as input. The display and the RTC both use I2C, so they can be wired in parallel. For the NodeMCU, the SCL pin is D1 and the SDA pin is D2.
+  <br/>
+  Final result:
+  ![alt text](https://i.imgur.com/3xcmRjk.jpg "Final result")
  <br/>
  
 2. Code
@@ -27,16 +32,18 @@ Got one of those power meters at home that blink an LED? You can track and monit
 **How does the code work?**
 <br/>
  
-At startup, the ESP8266 does a calibration. This means that it should be powered up only when sure the meter's LED will not be blinking. 
+ At startup,
+1. The SSD1306 is initialized
+2. A wireless connection is established
+3. The latest meter position is taken from the DSMR Reader server
+4. [World Time API](http://worldtimeapi.org) is used for synchronizing the DS1307 if necessary
+5. A calibration is done.
+
+During runtime, the ESP8266 calculates the consumption based on the interval between two LED blinks, assuming a 1W / blink base meter level. It then logs the reading to the server and displays it.
 <br/>
- 
-**How does it calibrate?**
- <br/>
- 
-The meter's LED off state is considered a base reading. Given that we are using an analog input, there will be noise. The ESP8266 does 100 readings at an interval of 10 ms and calculates the mean and the standard deviation of the readings. Whenever the meter's LED blinks, it gives a reading that is beyond + or - 2 standard deviations (depending on whether the photoresistor is pulled up or down by the resistor - the code accounts for either of these possibilities). When this happens, a POST request is made to the local ASP.NET Core middleware, which logs the reading, groups readings into days and forwards the request to the DSMR Reader server instance (yes, the middleware can be removed, but this requires some timing calculations on the ESP8266 which were 1000x easier to write in C#). The ESP8266 then waits for the reading to come back within normal range (<2 SDs) and waits for the next LED blink.
 
 # Results
 
-I've been running this power meter for the past 2 weeks and I've had no problems with it. This is an example of how my DSMR Reader dashboard looks like. Here, you can see the interval I turned my microwave oven on, when my fridge runs etc. It's ~~pretty~~ very accurate. 
+I've been running this for quite a while. This is how my DSMR Reader dashboard looks like. It's ~~pretty~~ very accurate. 
 
 ![alt text](https://i.imgur.com/denbdtQ.png "Results")
