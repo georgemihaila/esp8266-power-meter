@@ -31,13 +31,44 @@ double dev_offset = 0;
 
 double meterPosition = -1;
 
-void calibrate() {
-  int count = 5;
-  bool conditions[count];
-  for(;;) {
+double customMap(double x, double in_min, double in_max, double out_min, double out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
-    display.print(".");
-    display.display();
+void graph(double data[], int count){
+  double max = 0;
+  for(int i = 0; i < count; i++){
+    if (data[i] > max){
+      max = data[i];
+    }
+  }
+
+  double min = 0;
+  /*
+  double min = max;
+  for(int i = 0; i < count; i++){
+    if (data[i] == 0)
+        continue;
+    if (data[i] < min){
+      min = data[i];
+    }
+  }
+  Serial.println("Min: " + String(min));*/
+  for(int i = 0; i < count; i++){
+    int h = (int)customMap(data[i], min, max, 0, 35);
+    display.drawFastVLine(i, 64 - h, h, SSD1306_WHITE);
+    //display.drawFastVLine(i, 0, h, SSD1306_WHITE);
+    //display.drawPixel(i, 64 - h, SSD1306_WHITE);
+  }
+}
+
+void calibrate() {
+  int count = 4;
+  bool conditions[count];
+  
+  display.clearDisplay();
+  
+  for(;;) {
 
     int readings[READINGS];
     int sum = 0;
@@ -59,7 +90,7 @@ void calibrate() {
     conditions[1] = sd == 0;
     conditions[2] = sd > mean;
     conditions[3] = mean + dev_offset > 1023;
-    conditions[4] = mean - dev_offset <= 0;
+    //conditions[4] = mean - dev_offset <= 0;
 
     Serial.print("Calibration\nMean: " + String(mean) + "\n");
     Serial.print("SD:   " + String(sd) + "\n");
@@ -68,6 +99,9 @@ void calibrate() {
     for (int i = 0; i < count; i++){
       if (conditions[i]){
         Serial.print("Failure reason [" + String(i) + "]");
+        display.setCursor(0, 0);
+        display.print(String(i));
+        display.display();
         ok = false;
         break;
       }
@@ -154,6 +188,7 @@ void updateRTCTime(){
 
 
 void setup() {
+  WiFi.enableAP(false);
   Serial.begin(9600);
   
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
@@ -234,12 +269,14 @@ void drawCentreString(const String &buf, int x, int y)
 {
     int16_t x1, y1;
     uint16_t w, h;
-    display.getTextBounds(buf, x, y, &x1, &y1, &w, &h);
+    display.getTextBounds(buf, x, y, &x1, &y1, &w, &h); //calc width of new string
     display.setCursor(x - w / 2, y);
     display.print(buf);
 }
 
 int lastReading = -1;
+
+double lastReadings[128];
 
 void refreshDisplay(){
   display.clearDisplay();
@@ -248,16 +285,25 @@ void refreshDisplay(){
   String middleText = "";
   if (kws != 0){
     middleText += String(kws) + ".";
+
+    if (ws < 100){
+      middleText += "0";
+    } 
+    else if (ws < 10) {
+      middleText += "00";
+    }
   }
-  middleText += (ws < 100)?((ws < 10)?"00" + String(ws / 100):"0" + String(ws / 10)):String(ws);
+  
+  middleText += String(ws);
+
   if (kws != 0){
     middleText += "k";
   }
   middleText += "Wh";
   display.setTextSize(2);
-  drawCentreString(middleText, 64, 25);
+  drawCentreString(middleText, 64, 10);
   display.setTextSize(1);
-  display.drawRect(0,0, ((kws > 5)?5:kws) * 128 / 5, 5, 0);
+  graph(lastReadings, 128);
   display.display();
 }
 
@@ -295,30 +341,45 @@ void postReading(){
   http.end();
 }
 
+int totalReadings = 0;
+
 void loop() {
-  delay(20);
+  delay(5);
   yield();
   lastReading = analogRead(A0);
   
   if (abs(lastReading - mean) > dev_offset){
     long currentTickTimestamp = millis();
-    currentConsumption = 3600 * 1000 / (currentTickTimestamp - lastTickTimestamp);
-    
-    if ((lastTickTimestamp != -1 || currentConsumption != 0) && (currentConsumption / 1000 >= RECALIBRATION_CONSUMPTION_KWH)) { //Recalibrate if readings are too high
-      lastTickTimestamp = -1;
-      currentConsumption = 0;
-      calibrate();
-      refreshDisplay();
-      return;
+    if (lastTickTimestamp != -1) {
+        currentConsumption = 3600 * 1000 / (currentTickTimestamp - lastTickTimestamp);
+
+         if (currentConsumption / 1000 >= RECALIBRATION_CONSUMPTION_KWH) { //Recalibrate if readings are too high
+            lastTickTimestamp = -1;
+            calibrate();
+            display.clearDisplay();
+            display.print("finishing");
+            display.display();
+            return;
+        }
+        if (totalReadings < 3){
+            totalReadings++;
+            display.print(".");
+            display.display();
+        }
+        else{
+            updateRTCTime();
+            postReading();
+            lastReadings[127] = currentConsumption;
+            refreshDisplay();
+            for(int i = 0; i < 127; i++){
+                lastReadings[i] = lastReadings[i + 1];
+            } 
+        }
     }
-    
+
     meterPosition += 0.001;
-    if (lastTickTimestamp != -1 || currentConsumption != 0){
-      updateRTCTime();
-      postReading();
-    }
     lastTickTimestamp = currentTickTimestamp;
-    refreshDisplay();
+    
     digitalWrite(LED_BUILTIN, LOW);
     while (abs(analogRead(A0) - mean) > dev_offset){
       delay(20);
